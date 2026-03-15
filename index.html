@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>塔RPG Ver7.6 完全版</title>
+<title>塔RPG Ver7.7 完全版</title>
 <style>
 body{font-family:sans-serif;text-align:center;background:#111;color:white;margin:0;padding:0;}
 .game{max-width:480px;margin:auto;padding:10px;}
@@ -18,7 +18,7 @@ button{margin:3px;padding:10px;font-size:16px;border-radius:6px;}
 </head>
 <body>
 <div class="game">
-<h1>🏯塔RPG Ver7.6 完全版</h1>
+<h1>🏯塔RPG Ver7.7 完全版</h1>
 
 <h3 id="enemy"></h3>
 <div class="bar"><div id="enemybar" class="enemyBar"></div></div>
@@ -37,6 +37,17 @@ button{margin:3px;padding:10px;font-size:16px;border-radius:6px;}
 
 <button id="attackBtn">⚔攻撃</button>
 <button id="autoBtn">🔴オート戦闘OFF</button>
+<br>
+<label>オート優先スキル：
+  <select id="prioritySkillSelect">
+    <option value="0">🔥ファイア</option>
+    <option value="1">💧アイス</option>
+    <option value="2">⚡サンダー</option>
+    <option value="3">💖ヒール</option>
+    <option value="4">🛡バリア</option>
+  </select>
+</label>
+
 <div id="skillButtons"></div>
 
 <hr>
@@ -67,9 +78,7 @@ let logBox=document.getElementById("log");
 let logHistory=[];
 let autoBattleOn=false; // 初期OFF
 let nextFloorPending=false;
-
-// 優先スキル（インデックス指定）
-let prioritySkillIndex = 2; // ⚡サンダーを優先使用
+let prioritySkillIndex = 2; // デフォルトはサンダー
 
 // ログ（最新5件）
 function log(text){
@@ -91,24 +100,15 @@ function spawnEnemy(){
 // 攻撃（MP固定5回復）
 function attack(){
   if(enemyHP<=0) return;
-
   let damage = attackPower;
   if(Math.random()<0.15){damage *= 2; log("⚡クリティカル!");}
-  enemyHP -= damage;
-  if(enemyHP<0) enemyHP=0;
+  enemyHP -= damage; if(enemyHP<0) enemyHP=0;
   log("⚔ "+damage+" ダメージ!");
-
-  playerMP += 5;
-  if(playerMP>playerMaxMP) playerMP=playerMaxMP;
+  playerMP += 5; if(playerMP>playerMaxMP) playerMP=playerMaxMP;
   log("💧 5 MP回復!");
-
   if(enemyHP==0 && !nextFloorPending){
-    gold += 10 + floor;
-    exp += 5;
-    dropItem();
-    nextFloorPending=true;
+    gold += 10 + floor; exp += 5; dropItem(); nextFloorPending=true;
   }
-
   enemyAttack();
   levelUp();
   update();
@@ -126,14 +126,8 @@ function enemyAttack(){
 // レベルアップ
 function levelUp(){
   if(exp>=expMax){
-    exp=0;
-    level++;
-    attackPower+=2;
-    playerMax+=10;
-    playerHP=playerMax;
-    playerMaxMP+=5;
-    playerMP=playerMaxMP;
-    expMax+=5;
+    exp=0; level++; attackPower+=2; playerMax+=10; playerHP=playerMax;
+    playerMaxMP+=5; playerMP=playerMaxMP; expMax+=5;
   }
 }
 
@@ -144,8 +138,7 @@ function dropItem(){
   let names=["剣","斧","弓","杖","鎧","指輪"];
   let itemName=names[Math.floor(Math.random()*names.length)];
   let item={name:itemName,type:types[Math.floor(Math.random()*3)],attack:Math.floor(Math.random()*10)+5,def:Math.floor(Math.random()*5),level:1,maxLevel:5,rarity:randomRarity()};
-  inventory.push(item);
-  drawInventory();
+  inventory.push(item); drawInventory();
 }
 
 // ランダムレア
@@ -187,8 +180,7 @@ function rarityFuse(i){
   let newItem={name:item.name,type:item.type,attack:totalAttack+5,def:totalDef+3,level:1,maxLevel:maxLevel+5,rarity:rarityList[rIndex+1]};
   inventory.push(newItem);
   equipment[newItem.type]=newItem;
-  drawInventory();
-  updateStats();
+  drawInventory(); updateStats();
   log("✨レア度アップ! 自動装備されました!");
 }
 
@@ -246,35 +238,29 @@ function loadGame(){
   let data=localStorage.getItem("towerSave");
   if(!data) return;
   let d=JSON.parse(data);
-  floor=d.floor||1;
-  level=d.level||1;
-  gold=d.gold||0;
-  attackPower=d.attackPower||5;
-  playerMax=d.playerMax||100;
+  floor=d.floor||1; level=d.level||1; gold=d.gold||0;
+  attackPower=d.attackPower||5; playerMax=d.playerMax||100;
   playerHP=d.playerHP!==undefined ? d.playerHP : playerMax;
-  playerMaxMP=d.playerMaxMP||50;
-  playerMP=d.playerMP!==undefined ? d.playerMP : playerMaxMP;
-  inventory=d.inventory||[];
-  equipment=d.equipment||{weapon:null,armor:null,ring:null};
+  playerMaxMP=d.playerMaxMP||50; playerMP=d.playerMP!==undefined ? d.playerMP : playerMaxMP;
+  inventory=d.inventory||[]; equipment=d.equipment||{weapon:null,armor:null,ring:null};
 }
 
 // オート戦闘
 function autoBattle(){
   if(nextFloorPending){
-    nextFloorPending=false;
-    nextFloor();
+    nextFloorPending=false; nextFloor();
     return;
   }
   if(!autoBattleOn || enemyHP<=0) return;
 
-  // 優先スキルチェック
-  if(playerMP>=skills[prioritySkillIndex].cost){
+  // 優先スキルが使える場合
+  if(playerMP >= skills[prioritySkillIndex].cost){
     skills[prioritySkillIndex].action();
     return;
   }
 
-  // 他のスキル
-  let usable = skills.filter((s,i)=>playerMP>=s.cost && i!==prioritySkillIndex);
+  // MPが足りる他のスキルからランダム
+  let usable = skills.filter(s => playerMP >= s.cost);
   if(usable.length>0){
     usable[Math.floor(Math.random()*usable.length)].action();
   } else {
@@ -282,11 +268,14 @@ function autoBattle(){
   }
 }
 
+// 優先スキル選択
+document.getElementById("prioritySkillSelect").onchange=function(){
+  prioritySkillIndex = parseInt(this.value);
+  log("⚡ オート優先スキルを " + skills[prioritySkillIndex].name + " に変更");
+}
+
 // 初期化
-loadGame();
-spawnEnemy();
-drawSkills();
-update();
+loadGame(); spawnEnemy(); drawSkills(); update();
 document.getElementById("attackBtn").onclick=attack;
 document.getElementById("autoBtn").onclick=function(){
   autoBattleOn=!autoBattleOn;
