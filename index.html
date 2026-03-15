@@ -3,12 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>塔RPG Ver7.4（オート進行＆ログ制限）</title>
+<title>塔RPG Ver7.5（スキル＆MP対応）</title>
 <style>
 body{font-family:sans-serif;text-align:center;background:#111;color:white;margin:0;padding:0;}
 .game{max-width:480px;margin:auto;padding:10px;}
 .bar{width:100%;height:20px;background:#333;border-radius:10px;margin:4px 0;}
-.barInner{height:20px;background:red;border-radius:10px;transition:width 0.3s ease;}
+.barInner{height:20px;border-radius:10px;transition:width 0.3s ease;}
+.barInner.hp{background:red;}
+.barInner.mp{background:blue;}
 .enemyBar{height:15px;background:lime;border-radius:10px;transition:width 0.3s ease;}
 button{margin:3px;padding:10px;font-size:16px;border-radius:6px;}
 .item{background:#222;padding:6px;margin:5px;border-radius:8px;}
@@ -17,7 +19,7 @@ button{margin:3px;padding:10px;font-size:16px;border-radius:6px;}
 </head>
 <body>
 <div class="game">
-<h1>🏯塔RPG Ver7.4</h1>
+<h1>🏯塔RPG Ver7.5</h1>
 
 <h3 id="enemy"></h3>
 <div class="bar"><div id="enemybar" class="enemyBar"></div></div>
@@ -26,13 +28,18 @@ button{margin:3px;padding:10px;font-size:16px;border-radius:6px;}
 <hr>
 
 <div>階層 <span id="floor"></span></div>
-<div class="bar"><div id="hpbar" class="barInner"></div></div>
+<div class="bar"><div id="hpbar" class="barInner hp"></div></div>
 <div>HP <span id="hp"></span></div>
+
+<div>MP <span id="mp"></span></div>
+<div class="bar"><div id="mpbar" class="barInner mp"></div></div>
+
 <div>Lv <span id="level"></span></div>
 <div>EXP <span id="exp"></span></div>
 <div>💰 <span id="gold"></span></div>
 
 <button onclick="attack()">⚔攻撃</button>
+<div id="skillButtons"></div>
 
 <hr>
 <h3>🎒装備</h3>
@@ -54,18 +61,19 @@ button{margin:3px;padding:10px;font-size:16px;border-radius:6px;}
 // 初期値
 let floor=1, level=1, exp=0, expMax=10;
 let playerMax=100, playerHP=100, attackPower=5, defense=2, gold=0;
+let playerMaxMP=50, playerMP=50;
+
 let enemyHP=20, enemyMax=20, enemy="スライム";
 let inventory=[], equipment={weapon:null,armor:null,ring:null};
 let rarityList=["common","rare","epic","legend","mythic"], rarityOrder={common:1,rare:2,epic:3,legend:4,mythic:5};
-
 let logBox=document.getElementById("log");
-let logHistory=[]; // 最新5件ログ管理
+let logHistory=[];
 
-// ログ関数（最新5件まで）
+// ログ関数（最新5件）
 function log(text){
-    logHistory.unshift(text);
-    if(logHistory.length>5) logHistory.pop();
-    logBox.innerHTML = logHistory.join("<br>");
+  logHistory.unshift(text);
+  if(logHistory.length>5) logHistory.pop();
+  logBox.innerHTML=logHistory.join("<br>");
 }
 
 // 敵生成
@@ -84,13 +92,12 @@ function attack(){
   let damage=attackPower;
   if(Math.random()<0.15){damage*=2;alert("⚡クリティカル!");}
   enemyHP-=damage;
-  log("⚔ "+damage+"ダメージ!");
+  log("⚔ "+damage+" ダメージ!");
   if(enemyHP<=0){
     enemyHP=0;
     gold+=10+floor;
     exp+=5;
     dropItem();
-    // 自動で次の階に進む
     setTimeout(nextFloor,500);
   }
   enemyAttack();
@@ -104,12 +111,21 @@ function enemyAttack(){
   let dmg=5-defense;if(dmg<1)dmg=1;
   playerHP-=dmg;
   if(playerHP<=0){alert("ゲームオーバー");location.reload();}
-  log("敵の攻撃 "+dmg+"ダメージ");
+  log("敵の攻撃 "+dmg+" ダメージ");
 }
 
 // レベルアップ
 function levelUp(){
-  if(exp>=expMax){exp=0;level++;attackPower+=2;playerMax+=10;playerHP=playerMax;expMax+=5;}
+  if(exp>=expMax){
+    exp=0;
+    level++;
+    attackPower+=2;
+    playerMax+=10;
+    playerHP=playerMax;
+    playerMaxMP+=5;
+    playerMP=playerMaxMP;
+    expMax+=5;
+  }
 }
 
 // 装備生成
@@ -181,27 +197,82 @@ function sortRarity(){inventory.sort((a,b)=>rarityOrder[b.rarity]-rarityOrder[a.
 // 次の階
 function nextFloor(){floor++;spawnEnemy();update();}
 
+// スキル定義
+let skills=[
+  {name:"🔥ファイア", cost:20, action:function(){
+    if(playerMP<20){alert("MPが足りない"); return;}
+    playerMP-=20;
+    let dmg=attackPower*3;
+    enemyHP-=dmg;
+    log("🔥 ファイアで "+dmg+" ダメージ!");
+    if(enemyHP<=0){enemyHP=0; gold+=10+floor; exp+=5; dropItem(); setTimeout(nextFloor,500);}
+    update();
+  }},
+  {name:"💧アイス", cost:15, action:function(){
+    if(playerMP<15){alert("MPが足りない"); return;}
+    playerMP-=15;
+    let dmg=attackPower*1.5;
+    enemyHP-=dmg;
+    log("💧 アイスで "+Math.floor(dmg)+" ダメージ!");
+    update();
+  }},
+  {name:"⚡サンダー", cost:25, action:function(){
+    if(playerMP<25){alert("MPが足りない"); return;}
+    playerMP-=25;
+    let dmg=attackPower*2;
+    enemyHP-=dmg;
+    log("⚡ サンダーで "+Math.floor(dmg)+" ダメージ!");
+    update();
+  }},
+  {name:"💖ヒール", cost:15, action:function(){
+    if(playerMP<15){alert("MPが足りない"); return;}
+    playerMP-=15;
+    let heal=30;
+    playerHP+=heal;
+    if(playerHP>playerMax)playerHP=playerMax;
+    log("💖 ヒールで "+heal+" 回復!");
+    update();
+  }},
+  {name:"🛡バリア", cost:20, action:function(){
+    if(playerMP<20){alert("MPが足りない"); return;}
+    playerMP-=20;
+    defense+=5;
+    log("🛡 バリア発動! 次の敵攻撃5ダメージ軽減!");
+    setTimeout(()=>{defense-=5;},5000);
+    update();
+  }}
+];
+
+// スキルボタン描画
+function drawSkills(){
+  let html="";
+  skills.forEach((s,i)=>{
+    html += `<button onclick="skills[${i}].action()">${s.name} (${s.cost}MP)</button>`;
+  });
+  document.getElementById("skillButtons").innerHTML=html;
+}
+
 // 更新
 function update(){
-document.getElementById("floor").innerText=floor;
-document.getElementById("hp").innerText=playerHP+"/"+playerMax;
-document.getElementById("level").innerText=level;
-document.getElementById("exp").innerText=exp+"/"+expMax;
-document.getElementById("gold").innerText=gold;
-document.getElementById("enemyHP").innerText=enemyHP+"/"+enemyMax;
-document.getElementById("hpbar").style.width=(playerHP/playerMax*100)+"%";
-document.getElementById("enemybar").style.width=(enemyHP/enemyMax*100)+"%";
+  document.getElementById("floor").innerText=floor;
+  document.getElementById("hp").innerText=playerHP+"/"+playerMax;
+  document.getElementById("mp").innerText=playerMP+"/"+playerMaxMP;
+  document.getElementById("level").innerText=level;
+  document.getElementById("exp").innerText=exp+"/"+expMax;
+  document.getElementById("gold").innerText=gold;
+  document.getElementById("enemyHP").innerText=enemyHP+"/"+enemyMax;
+  document.getElementById("hpbar").style.width=(playerHP/playerMax*100)+"%";
+  document.getElementById("mpbar").style.width=(playerMP/playerMaxMP*100)+"%";
+  document.getElementById("enemybar").style.width=(enemyHP/enemyMax*100)+"%";
+  drawSkills();
 }
 
 // セーブ
-function saveGame(){localStorage.setItem("towerSave",JSON.stringify({floor, level, gold, attackPower, playerMax, playerHP, inventory, equipment}));alert("ゲームをセーブしました！");}
+function saveGame(){localStorage.setItem("towerSave",JSON.stringify({floor, level, gold, attackPower, playerMax, playerHP, playerMaxMP, playerMP, inventory, equipment}));alert("ゲームをセーブしました！");}
 
 // 読み込み
-function loadGame(){let data=localStorage.getItem("towerSave");if(!data)return;let d=JSON.parse(data);floor=d.floor;level=d.level;gold=d.gold;attackPower=d.attackPower;playerMax=d.playerMax;playerHP=d.playerHP;inventory=d.inventory||[];equipment=d.equipment||{weapon:null,armor:null,ring:null};}
+function loadGame(){let data=localStorage.getItem("towerSave");if(!data)return;let d=JSON.parse(data);floor=d.floor;level=d.level;gold=d.gold;attackPower=d.attackPower;playerMax=d.playerMax;playerHP=d.playerHP;playerMaxMP=d.playerMaxMP;playerMP=d.playerMP;inventory=d.inventory||[];equipment=d.equipment||{weapon:null,armor:null,ring:null};}
 
 loadGame();
 spawnEnemy();
 update();
-</script>
-</body>
-</html>
