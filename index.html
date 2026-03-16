@@ -4,11 +4,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>塔RPG V2.7</title>
+<title>塔RPG V3.0</title>
 
 <style>
 body{background:#111;color:white;font-family:sans-serif;margin:0}
-.game{max-width:500px;margin:auto;padding:10px}
+.game{max-width:520px;margin:auto;padding:10px}
 .panel{background:#1b1b1b;padding:10px;margin:8px 0;border-radius:10px}
 .bar{width:100%;height:20px;background:#333;border-radius:10px}
 .hpbar{background:red;height:100%}
@@ -26,7 +26,7 @@ button{background:#333;color:white;border:none;padding:8px;margin:3px;border-rad
 
 <div class="game">
 
-<h2>🏯塔RPG V2.7</h2>
+<h2>🏯塔RPG V3.0</h2>
 
 <div class="panel">
 <div id="enemy"></div>
@@ -57,7 +57,9 @@ EXP <span id="exp"></span><br>
 <option value="0">🔥</option>
 <option value="1">❄</option>
 <option value="2">⚡</option>
-<option value="3">🩸</option>
+<option value="3">💖</option>
+<option value="4">🩸</option>
+<option value="5">✨</option>
 </select>
 
 <div id="skills"></div>
@@ -95,8 +97,6 @@ EXP <span id="exp"></span><br>
 
 <script>
 
-/* プレイヤー */
-
 let floor=1
 let level=1
 let exp=0
@@ -113,34 +113,23 @@ let defense=2
 
 let gold=100
 
-/* 敵 */
-
 let enemy=""
 let enemyHP=0
 let enemyMax=0
 
-/* システム */
-
 let auto=false
+
 let inventory=[]
 
 let rarity=["common","rare","epic","legend","mythic"]
 
-/* ログ */
-
 let logHistory=[]
 
 function log(t){
-
 logHistory.unshift(t)
-
 if(logHistory.length>8)logHistory.pop()
-
 document.getElementById("log").innerHTML=logHistory.join("<br>")
-
 }
-
-/* 敵 */
 
 function spawnEnemy(){
 
@@ -151,11 +140,8 @@ enemy=list[Math.floor(Math.random()*list.length)]
 enemyMax=20+floor*5
 
 if(floor%10==0){
-
 enemy="🐉ボス"
-
 enemyMax=200+floor*10
-
 }
 
 enemyHP=enemyMax
@@ -163,8 +149,6 @@ enemyHP=enemyMax
 document.getElementById("enemy").innerText=enemy
 
 }
-
-/* 攻撃 */
 
 function playerAttack(){
 
@@ -189,21 +173,53 @@ let dmg=5+floor-defense
 
 if(dmg<1)dmg=1
 
+if(enemy.includes("ボス")){
+
+let r=Math.random()
+
+if(r<0.3){
+
+dmg*=2
+log("🐉強攻撃 "+dmg)
+
+}
+
+else if(r<0.45){
+
+let heal=Math.floor(enemyMax*0.1)
+
+enemyHP+=heal
+
+if(enemyHP>enemyMax)enemyHP=enemyMax
+
+log("🐉ボス回復 "+heal)
+
+update()
+return
+
+}
+
+}
+
 playerHP-=dmg
 
 log("👾 "+dmg)
 
 if(playerHP<=0){
 
-alert("ゲームオーバー")
+let choice=confirm("ゲームオーバー\nOK=セーブ地点\nキャンセル=最初から")
 
+if(choice){
+load()
+}else{
 location.reload()
-
 }
 
 }
 
-/* 戦闘 */
+update()
+
+}
 
 function battleCheck(){
 
@@ -227,78 +243,66 @@ update()
 
 }
 
-/* スキル */
-
 let skills=[
 
 {name:"🔥",cost:20,action(){
-
 if(playerMP<20)return
-
 playerMP-=20
-
 let dmg=attack*3
-
 enemyHP-=dmg
-
 log("🔥 "+dmg)
-
 battleCheck()
-
 }},
 
 {name:"❄",cost:15,action(){
-
 if(playerMP<15)return
-
 playerMP-=15
-
 let dmg=attack*2
-
 enemyHP-=dmg
-
 log("❄ "+dmg)
-
 battleCheck()
-
 }},
 
 {name:"⚡",cost:25,action(){
-
 if(playerMP<25)return
-
 playerMP-=25
-
 let dmg=attack*2.5
-
 enemyHP-=dmg
-
 log("⚡ "+dmg)
-
 battleCheck()
+}},
 
+{name:"💖",cost:15,action(){
+if(playerMP<15)return
+playerMP-=15
+playerHP+=40
+if(playerHP>playerMax)playerHP=playerMax
+log("💖回復")
+update()
+enemyAttack()
 }},
 
 {name:"🩸",cost:20,action(){
-
 if(playerMP<20)return
-
 playerMP-=20
-
 let dmg=attack*2
-
 enemyHP-=dmg
-
 let heal=Math.floor(dmg/2)
-
 playerHP+=heal
-
 if(playerHP>playerMax)playerHP=playerMax
-
-log("🩸 "+dmg+" / "+heal+"回復")
-
+log("🩸"+dmg+" / "+heal)
 battleCheck()
+}},
 
+{name:"✨",cost:20,action(){
+if(playerMP<20)return
+playerMP-=20
+let heal=Math.floor(playerMax*0.25)
+playerHP+=heal
+if(playerHP>playerMax)playerHP=playerMax
+log("✨"+heal+"回復")
+update()
+enemyAttack()
 }}
 
 ]
@@ -308,31 +312,35 @@ function drawSkills(){
 let html=""
 
 skills.forEach((s,i)=>{
-
 html+=`<button onclick="skills[${i}].action()">${s.name}</button>`
-
 })
 
 document.getElementById("skills").innerHTML=html
 
 }
 
-/* オート */
-
 function autoBattle(){
 
 if(!auto)return
 
-let p=Number(document.getElementById("prioritySkill").value)
+let enemyDamage = 5 + floor - defense
 
-if(playerMP>=skills[p].cost){
+if(enemyDamage < 1) enemyDamage = 1
 
+if(playerHP - enemyDamage*2 <= 0){
+
+auto=false
+log("⚠危険！オート解除")
+return
+
+}
+
+let p = Number(document.getElementById("prioritySkill").value)
+
+if(playerMP >= skills[p].cost){
 skills[p].action()
-
 }else{
-
 playerAttack()
-
 }
 
 }
@@ -341,9 +349,7 @@ setInterval(autoBattle,900)
 
 function toggleAuto(){auto=!auto}
 
-/* アイテム */
-
-function createItem(r){
+function createItem(){
 
 let types=["sword","armor","ring"]
 
@@ -353,7 +359,7 @@ let atk=Math.floor(Math.random()*20)+floor
 let def=Math.floor(Math.random()*15)
 let mp=Math.floor(Math.random()*20)
 
-return{type,atk,def,mp,rarity:r}
+return{type,atk,def,mp}
 
 }
 
@@ -361,15 +367,11 @@ function dropItem(){
 
 if(Math.random()>0.3)return
 
-let r=rarity[Math.floor(Math.random()*rarity.length)]
-
-inventory.push(createItem(r))
+inventory.push(createItem())
 
 drawInventory()
 
 }
-
-/* 装備 */
 
 function drawInventory(){
 
@@ -414,11 +416,7 @@ update()
 
 function sell(i){
 
-let item=inventory[i]
-
-let price={common:10,rare:30,epic:80,legend:200,mythic:500}
-
-gold+=price[item.rarity]||10
+gold+=20
 
 inventory.splice(i,1)
 
@@ -430,45 +428,19 @@ update()
 
 function combine(){
 
-let groups={}
+if(inventory.length<3)return
 
-inventory.forEach((i,index)=>{
+inventory.splice(0,3)
 
-if(!groups[i.rarity])groups[i.rarity]=[]
-
-groups[i.rarity].push(index)
-
-})
-
-for(let r in groups){
-
-if(groups[r].length>=3){
-
-let a=groups[r].slice(0,3)
-
-a.reverse().forEach(i=>inventory.splice(i,1))
-
-let next=rarity.indexOf(r)+1
-
-inventory.push(createItem(rarity[next]))
-
-break
-
-}
-
-}
+inventory.push(createItem())
 
 drawInventory()
 
 }
 
-/* 並び替え */
-
 function sortATK(){inventory.sort((a,b)=>b.atk-a.atk);drawInventory()}
 function sortDEF(){inventory.sort((a,b)=>b.def-a.def);drawInventory()}
 function sortMP(){inventory.sort((a,b)=>b.mp-a.mp);drawInventory()}
-
-/* ショップ */
 
 function buyPotion(){
 
@@ -490,15 +462,11 @@ if(gold<100)return
 
 gold-=100
 
-let r=rarity[Math.floor(Math.random()*rarity.length)]
-
-inventory.push(createItem(r))
+inventory.push(createItem())
 
 drawInventory()
 
 }
-
-/* 次 */
 
 function next(){
 
@@ -509,8 +477,6 @@ spawnEnemy()
 update()
 
 }
-
-/* レベル */
 
 function levelUp(){
 
@@ -534,17 +500,49 @@ playerMP=playerMaxMP
 
 }
 
-/* セーブ */
-
 function save(){
 
-let data={floor,level,gold,inventory}
+let data={
+floor,
+level,
+exp,
+playerHP,
+playerMP,
+attack,
+defense,
+gold,
+inventory
+}
 
 localStorage.setItem("towerRPG",JSON.stringify(data))
 
+log("💾セーブ")
+
 }
 
-/* 更新 */
+function load(){
+
+let data=localStorage.getItem("towerRPG")
+
+if(!data)return
+
+let d=JSON.parse(data)
+
+floor=d.floor
+level=d.level
+exp=d.exp
+playerHP=d.playerHP
+playerMP=d.playerMP
+attack=d.attack
+defense=d.defense
+gold=d.gold
+inventory=d.inventory
+
+spawnEnemy()
+drawInventory()
+update()
+
+}
 
 function update(){
 
